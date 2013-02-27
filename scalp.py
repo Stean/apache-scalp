@@ -29,12 +29,18 @@
             Added Regexp to the XML output.  Also added this to the DTD
         12312008: Don C. Weber
             Added IP and Subnet exclusion capability to cmd line input and scalper function
+	01232013: Stefan Stahl
+	    Added code for returning exit code, if attacks were found
+	01232013: Stefan Stahl
+	    logfile-argument accepts now glob (can contain Wildcard like * or ?)
 
 """
 from __future__ import with_statement
 import time, base64
 import os,sys,re,random
 from StringIO import StringIO
+import glob
+
 try:
     from lxml import etree
 except ImportError:
@@ -47,10 +53,10 @@ except ImportError:
             print "Cannot find the ElementTree in your python packages"
 
 __application__ = "scalp"
-__version__     = "0.5"
+__version__     = "0.6"
 __release__     = __application__ + '/' + __version__
 __author__      = "Romain Gaucher"
-__credits__      = ["Romain Gaucher", "Don C. Weber"]
+__credits__      = ["Romain Gaucher", "Don C. Weber", "Stefan Stahl"]
 
 names = {
     'xss'  : 'Cross-Site Scripting',
@@ -270,6 +276,8 @@ def analyzer(data):
 
 def scalper(access, filters, preferences = [], output = "text"):
     global table
+    if os.path.isdir(access):
+	access = access
     if not os.path.isfile(access):
         print "error: the log file doesn't exist"
         return
@@ -392,6 +400,13 @@ def scalper(access, filters, preferences = [], output = "text"):
     print "\tProcessed %d lines over %d" % (loc,lines)
     print "\tFound %d attack patterns in %f s" % (n,tt)
 
+    # generate exceptions
+    if len(diff) > 0:
+        o_except = open(os.path.abspath(preferences['odir'] + os.sep + "scalp_except.txt"), "w")
+        for l in diff:
+            o_except.write(l + '\n')
+        o_except.close()
+
     short_name = access[access.rfind(os.sep)+1:]
     if n > 0:
         print "Generating output in %s%s%s_scalp_*" % (preferences['odir'],os.sep,short_name)
@@ -401,14 +416,9 @@ def scalper(access, filters, preferences = [], output = "text"):
             generate_text_file(flag, short_name, filters, preferences['odir'])
         elif 'xml' in preferences['output']:
             generate_xml_file(flag, short_name, filters, preferences['odir'])
-
-    # generate exceptions
-    if len(diff) > 0:
-        o_except = open(os.path.abspath(preferences['odir'] + os.sep + "scalp_except.txt"), "w")
-        for l in diff:
-            o_except.write(l + '\n')
-        o_except.close()
-
+	
+	#return with exit code 2 (because we found attacks)
+	sys.exit(2)
 
 def generate_text_file(flag, access, filters, odir):
     curtime = time.strftime("%a-%d-%b-%Y", time.localtime())
